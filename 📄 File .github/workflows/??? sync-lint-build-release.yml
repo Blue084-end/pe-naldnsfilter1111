@@ -1,0 +1,77 @@
+name: Sync, Lint, Build & Release APK
+
+on:
+  workflow_dispatch: # Cho phép chạy thủ công
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. Lấy code từ repo fork của bạn
+    - name: Checkout fork
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    # 2. Đồng bộ code mới nhất từ repo gốc
+    - name: Sync from upstream
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git remote add upstream https://github.com/IngoZenz/personaldnsfilter.git
+        git fetch upstream
+        git merge upstream/master --allow-unrelated-histories -m "Sync from upstream"
+        git push origin master
+
+    # 3. Cài JDK 17
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    # 4. Cài Android SDK
+    - name: Set up Android SDK
+      uses: android-actions/setup-android@v3
+
+    # 5. Cài Google Java Format để auto-format code
+    - name: Install Google Java Format
+      run: |
+        curl -LJO https://github.com/google/google-java-format/releases/download/v1.17.0/google-java-format-1.17.0-all-deps.jar
+
+    - name: Format Java files
+      run: |
+        find . -name "*.java" -print0 | xargs -0 java -jar google-java-format-1.17.0-all-deps.jar --replace
+
+    # 6. Commit & push nếu có thay đổi sau khi format
+    - name: Commit formatted code
+      run: |
+        git add .
+        git diff --cached --quiet || (git commit -m "Auto format code" && git push origin master)
+
+    # 7. Cho phép chạy gradlew
+    - name: Grant execute permission for gradlew
+      run: chmod +x ./gradlew
+
+    # 8. Build APK bản release
+    - name: Build Release APK
+      run: ./gradlew assembleRelease
+
+    # 9. Lấy versionName từ Gradle (nếu có task printVersionName)
+    - name: Get version name
+      id: get_version
+      run: |
+        VERSION_NAME=$(./gradlew -q printVersionName || echo "latest")
+        echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+
+    # 10. Tạo Release mới và upload APK
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ steps.get_version.outputs.version_name }}
+        name: Release v${{ steps.get_version.outputs.version_name }}
+        body: "Auto-generated release with latest upstream code, formatted and built."
+        files: app/build/outputs/apk/release/*.apk
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
