@@ -56,15 +56,41 @@ public class UDPPacket extends IPPacket {
         return internal && checkSum == 0 ? 0xFFFF : checkSum;
     }
 
-    public int getSourcePort() {
-        return udpHeader.get(0) >>> 16;
-    }
-
-    public int getDestPort() {
-        return udpHeader.get(0) & 0xFFFF;
-    }
+    
 
     private boolean isValidPort(int port) {
         return port >= 1 && port <= 65535;
     }
+
+
+    
+	
+	}
+
+	public int getDestPort() {
+		return udpHeader.get(0) & 0x0000FFFF;
+	}
+
+	public int getLength() {
+		return udpHeader.get(1) >>> 16;
+	}
+
+	public int getIPPacketLength() {
+		return super.getLength();
+	}
+
+	public int getHeaderLength() {
+		return ipHdrlen + 8;
+	}
+
+	public int getOffset() {
+		return super.getOffset() + ipHdrlen;
+	}
+
+	public int getIPPacketOffset() {
+		return super.getOffset();
+	}
+
+     
 }
+
