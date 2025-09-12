@@ -19,19 +19,13 @@ public class UDPPacket extends IPPacket {
     }
 
     public void updateHeader(int sourcePort, int destPort) {
-        if (!isValidPort(sourcePort) || !isValidPort(destPort)) {
-            System.err.println("[UDPPacket] Cổng không hợp lệ: " + sourcePort + " hoặc " + destPort);
-            return;
-        }
-
         int[] hdr = new int[2];
         hdr[0] = (sourcePort << 16) + destPort;
         hdr[1] = (len - ipHdrlen) << 16;
         udpHeader.position(0);
         udpHeader.put(hdr);
-
-        int checksum = calculateCheckSum(true);
-        udpHeader.put(1, hdr[1] + checksum);
+        hdr[1] += calculateCheckSum(true);
+        udpHeader.put(1, hdr[1]);
     }
 
     public int checkCheckSum() {
@@ -43,7 +37,7 @@ public class UDPPacket extends IPPacket {
         if (version == 4) {
             int saved = ipHeader.get(2);
             ipHeader.put(2, (17 << 16) + len - ipHdrlen);
-            checkSum = CheckSum.chkSum(data, offset + ipHdrlen, len - ipHdrlen);
+            checkSum = CheckSum.chkSum(data, offset + 8, len - 8);
             ipHeader.put(2, saved);
         } else if (version == 6) {
             int[] saved = new int[]{ipHeader.get(0), ipHeader.get(1)};
@@ -56,41 +50,9 @@ public class UDPPacket extends IPPacket {
         return internal && checkSum == 0 ? 0xFFFF : checkSum;
     }
 
-    
-
-    private boolean isValidPort(int port) {
-        return port >= 1 && port <= 65535;
+    public int getSourcePort() {
+        return udpHeader.get(0) >>> 16;
     }
 
-
-    
-	
-	}
-
-	public int getDestPort() {
-		return udpHeader.get(0) & 0x0000FFFF;
-	}
-
-	public int getLength() {
-		return udpHeader.get(1) >>> 16;
-	}
-
-	public int getIPPacketLength() {
-		return super.getLength();
-	}
-
-	public int getHeaderLength() {
-		return ipHdrlen + 8;
-	}
-
-	public int getOffset() {
-		return super.getOffset() + ipHdrlen;
-	}
-
-	public int getIPPacketOffset() {
-		return super.getOffset();
-	}
-
-     
-}
-
+    public int getDestPort() {
+        return udpHeader.get
